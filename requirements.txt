@@ -1,3 +1,4 @@
-Flask==2.3.2
-requests==2.31.0
-urllib3==1.26.16
+flask==2.3.2
+aiohttp==3.8.4
+asyncio==3.4.3
+python-dotenv==1.0.0
